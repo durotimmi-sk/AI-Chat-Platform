@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_chat
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+    restart: always
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ai_chat
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
