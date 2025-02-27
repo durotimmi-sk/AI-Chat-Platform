@@ -1,0 +1,44 @@
+# 🚀 Ignore environment variables (API keys, database credentials)
+.env
+.env.local
+.env.production
+.env.development
+
+# 🚀 Ignore Python cache & compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 🚀 Ignore database migrations cache
+migrations/versions/*.pyc
+migrations/versions/__pycache__/
+
+# 🚀 Ignore Docker & dependency files
+*.log
+*.sqlite3
+*.db
+*.DS_Store
+*.pid
+*.swp
+.vscode/
+.idea/
+.venv/
+venv/
+node_modules/
+
+# 🚀 Ignore virtual environments
+Pipfile
+Pipfile.lock
+poetry.lock
+pyvenv.cfg
+
+# 🚀 Ignore Docker Build files
+docker-compose.override.yml
+docker-entrypoint.sh
+
+# 🚀 Ignore Jupyter Notebook checkpoints (if used)
+.ipynb_checkpoints/
+
+# 🚀 Ignore FastAPI test cache
+tests/__pycache__/
