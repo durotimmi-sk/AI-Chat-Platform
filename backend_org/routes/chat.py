@@ -59,22 +59,20 @@ class ChatHistoryResponse(BaseModel):
     conversation_id: int
     messages: List[MessageResponse]
 
-# ✅ Fixed `chat_with_ai` Function
+# ✅ Chat with AI and Save Messages
 @router.post("/")
 def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
+    """
+    Handle chat with AI character.
+    """
     try:
-        # Check if the character is predefined or custom
-        character_persona = CHARACTER_PERSONAS.get(
-            request.character, f"You are {request.character}, a custom AI character."
-        )
-
-        # Retrieve existing conversation or create a new one
+        # Ensure the conversation exists
         conversation = db.query(Conversation).filter_by(user_id=request.user_id, character=request.character).first()
         if not conversation:
             conversation = Conversation(user_id=request.user_id, character=request.character)
             db.add(conversation)
             db.commit()
-            db.refresh(conversation)  # Refresh to get conversation.id
+            db.refresh(conversation)
 
         # Retrieve previous chat messages for history
         previous_messages = db.query(Message).filter_by(conversation_id=conversation.id).order_by(Message.timestamp).all()
@@ -85,7 +83,12 @@ def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
         db.add(user_message)
         db.commit()
 
-        # ✅ Correctly format `full_context` before passing it to the LLM
+        # AI character context
+        character_persona = CHARACTER_PERSONAS.get(
+            request.character, f"You are {request.character}, a custom AI character."
+        )
+
+        # ✅ Format `full_context` before passing it to the AI
         full_context = f"{character_persona}\n\n{history}\nUser: {request.message}\n{request.character}:"
 
         # Initialize the prompt
@@ -112,17 +115,47 @@ def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
 # ✅ Retrieve Chat History
 @router.get("/history/{user_id}/{character}", response_model=ChatHistoryResponse)
 def get_chat_history(user_id: int, character: str, db: Session = Depends(get_db)):
-    conversation = db.query(Conversation).filter_by(user_id=user_id, character=character).first()
+    """
+    Retrieve chat history for a given user and character.
+    """
+    try:
+        # Debugging: Log the request parameters
+        print(f"🔍 Fetching chat history for User ID: {user_id}, Character: {character}")
 
-    if not conversation:
-        raise HTTPException(status_code=404, detail="No conversation found.")
+        # Ensure correct character formatting for database lookup
+        formatted_character = character.replace("%20", " ")
 
-    messages = db.query(Message).filter_by(conversation_id=conversation.id).order_by(Message.timestamp).all()
+        # Retrieve the conversation
+        conversation = db.query(Conversation).filter_by(user_id=user_id, character=formatted_character).first()
 
-    return {
-        "conversation_id": conversation.id,
-        "messages": [{"sender": msg.sender, "content": msg.content, "timestamp": msg.timestamp} for msg in messages]
-    }
+        if not conversation:
+            raise HTTPException(status_code=404, detail="No conversation found.")
+
+        # Fetch messages and sort them by timestamp
+        messages = (
+            db.query(Message)
+            .filter_by(conversation_id=conversation.id)
+            .order_by(Message.timestamp.asc())  # Sort messages by time
+            .all()
+        )
+
+        # Convert timestamps to ISO format for proper serialization
+        message_list = [
+            {
+                "sender": msg.sender,
+                "content": msg.content,
+                "timestamp": msg.timestamp.isoformat() if msg.timestamp else "N/A",
+            }
+            for msg in messages
+        ]
+
+        return {"conversation_id": conversation.id, "messages": message_list}
+
+    except Exception as e:
+        print(f"❌ Error retrieving chat history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error: Unable to retrieve chat history")
+
+
 
 # ✅ Get List of Available AI Characters
 @router.get("/characters/")
@@ -135,6 +168,9 @@ def get_characters():
 # ✅ Fix async handling in character generation
 @router.post("/characters/generate", response_model=dict)
 async def create_dynamic_character(request: CharacterGenerationRequest, db: Session = Depends(get_db)):
+    """
+    Generate a new AI character dynamically.
+    """
     try:
         character_data = await generate_character(request)
 

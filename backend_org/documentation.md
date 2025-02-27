@@ -1,12 +1,16 @@
-# **📌 AI Chat Platform - Backend Documentation**
+
+
+# **📌 AI Chat Platform - Backend & Gradio UI Documentation**
 🚀 **Version:** 1.0  
-🛠 **Technology Stack:** FastAPI, PostgreSQL, Docker, Alembic, SQLAlchemy, LangChain  
+🛠 **Technology Stack:** FastAPI, PostgreSQL, Docker, Alembic, SQLAlchemy, LangChain, Gradio  
 📅 **Last Updated:** _(Insert Date)_  
 
 ---
 
 ## **📖 Overview**
-The **AI Chat Platform Backend** provides API endpoints to interact with AI characters via text and WebSockets. It includes **authentication, AI chat interactions, conversation history storage, character generation, and voice support**.
+The **AI Chat Platform Backend & Gradio UI** provides API endpoints to interact with AI characters via text and WebSockets. It includes **authentication, AI chat interactions, conversation history storage, character generation, and voice support**.  
+
+The **Gradio UI (`gradio_ui.py`)** serves as the frontend, allowing users to **sign up, log in, select AI characters, chat, and view chat history**.
 
 ---
 
@@ -31,6 +35,8 @@ backend/
 │── services/                # 📂 Business Logic Services
 │   ├── audio_service.py     # 📌 Handles WebSocket audio (speech-to-text, text-to-speech)
 │   ├── character_generator.py # 📌 AI Character Generation
+│
+│── gradio_ui.py             # 📌 Main Gradio interface (AI Chat Frontend)
 │
 │── .env                     # 📌 Environment Variables (API keys, DB credentials)
 │── alembic.ini              # 📌 Alembic Configuration
@@ -60,6 +66,7 @@ Paste this inside:
 DATABASE_URL=postgresql://root:root@db:5432/ai_chat_platform
 GROQ_API_KEY=your-api-key
 SECRET_KEY=your-secret-key
+FASTAPI_URL=http://localhost:8000
 ```
 
 ### **3️⃣ Install Dependencies**
@@ -67,7 +74,7 @@ SECRET_KEY=your-secret-key
 pip install -r requirements.txt
 ```
 
-### **4️⃣ Start the Application**
+### **4️⃣ Start the Backend Application**
 **Using Docker:**
 ```bash
 docker-compose up --build
@@ -78,10 +85,40 @@ docker-compose up --build
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### **5️⃣ Run Database Migrations**
+### **5️⃣ Start the Gradio UI**
+```bash
+python frontend/gradio_ui.py
+```
+Gradio will provide a **local URL** (e.g., `http://127.0.0.1:7860`) to access the AI chat interface.
+
+### **6️⃣ Run Database Migrations**
 ```bash
 docker-compose exec backend alembic upgrade head
 ```
+
+---
+
+## **🖥️ Features**
+### **🔑 User Authentication**
+- **Sign Up:** Create a new account.
+- **Login:** Authenticate with username and password.
+- **Session Management:** Stores `user_id`, chat history, and selected AI character.
+
+### **🎭 AI Character Selection**
+- Users can choose from **predefined characters**:
+  - Chuck the Clown 🤡
+  - Sarcastic Pirate 🏴‍☠️
+  - Professor Sage 🎓
+  - Yoda from Star Wars 🟢
+- Option to create **custom AI characters**.
+
+### **💬 AI Chat Functionality**
+- **Real-time Chat:** User messages are sent to the backend, and AI responses are returned.
+- **ChatGPT-Style Interface:** Messages appear in a formatted conversation window.
+
+### **📜 Chat History**
+- **Saves previous conversations** for logged-in users.
+- Loads chat history automatically after login.
 
 ---
 
@@ -93,14 +130,6 @@ docker-compose exec backend alembic upgrade head
 | `POST`     | `/auth/token`           | Login and get JWT token           |
 | `GET`      | `/auth/me`              | Get logged-in user details        |
 
-#### **Example: User Registration**
-```bash
-curl -X POST "http://localhost:8000/auth/register" -H "Content-Type: application/json" -d '{
-  "username": "testuser",
-  "password": "password123"
-}'
-```
-
 ---
 
 ### **💬 AI Chat (`routes/chat.py`)**
@@ -110,103 +139,71 @@ curl -X POST "http://localhost:8000/auth/register" -H "Content-Type: application
 | `POST`     | `/chat/`                    | Start conversation with AI        |
 | `GET`      | `/chat/history/{user_id}/{character}` | Get conversation history |
 
-#### **Example: Start Chat with AI**
-```bash
-curl -X POST "http://localhost:8000/chat/" -H "Content-Type: application/json" -d '{
-  "user_id": 1,
-  "character": "Chuck the Clown",
-  "message": "Tell me a joke!"
-}'
-```
-✅ **Response**
-```json
-{
-  "user": "Tell me a joke!",
-  "Chuck the Clown": "Why did the scarecrow win an award? Because he was outstanding in his field!",
-  "conversation_id": 5
-}
-```
-
-#### **Example: Get Chat History**
-```bash
-curl -X GET "http://localhost:8000/chat/history/1/Chuck%20the%20Clown"
-```
-✅ **Response**
-```json
-{
-  "conversation_id": 5,
-  "messages": [
-    {"sender": "User", "content": "Tell me a joke!"},
-    {"sender": "Chuck the Clown", "content": "Why did the scarecrow win an award? Because he was outstanding in his field!"}
-  ]
-}
-```
-
 ---
 
-### **🎙 Voice Chat (`services/audio_service.py`)**
-| **Method** | **Endpoint**              | **Description**                      |
-|------------|---------------------------|--------------------------------------|
-| `WS`       | `/ws/audio/{client_id}`   | WebSocket endpoint for voice chat   |
+## **🎨 Gradio UI (`frontend/gradio_ui.py`)**
+### **💻 Key Functions**
+| **Function** | **Description** |
+|-------------|----------------|
+| `signup()` | Registers a new user |
+| `login()` | Authenticates user, loads chat history |
+| `get_characters()` | Fetches available AI characters |
+| `chat_with_ai()` | Sends user message to backend, retrieves AI response |
+| `get_chat_history()` | Loads previous chat conversations |
+| `create_gradio_interface()` | Builds the Gradio UI |
 
-#### **Example: Connect WebSocket**
-```bash
-wscat -c ws://localhost:8000/ws/audio/test-client
+### **💬 Chat UI Function**
+```python
+def chat_ui(user_message, chat_history, session):
+    """Handles user input and updates chat in correct Gradio format."""
+    if not session["user_id"]:
+        chat_history.append(("System", "❌ Please log in first."))
+        return chat_history, session
+    if not session["character"]:
+        chat_history.append(("System", "❌ Please select a character."))
+        return chat_history, session
+
+    ai_response, session = chat_with_ai(user_message, session)
+    if isinstance(ai_response, str):
+        chat_history.append(("You", user_message))
+        chat_history.append(("AI", ai_response))
+    else:
+        chat_history.append(("System", "⚠️ Unexpected response format."))
+    
+    return chat_history, session
 ```
 
----
-
-## **💾 Database Models (`models/models.py`)**
-### **User**
-| Column    | Type   | Description                 |
-|-----------|--------|---------------------------|
-| `id`      | `int`  | Primary Key (Auto-Inc)     |
-| `username`| `str`  | Unique username            |
-| `password`| `str`  | Hashed password            |
-
-### **Conversation**
-| Column         | Type   | Description                     |
-|---------------|--------|---------------------------------|
-| `id`          | `int`  | Primary Key                     |
-| `user_id`     | `int`  | Foreign Key (User ID)           |
-| `character`   | `str`  | AI Character Name               |
-| `created_at`  | `datetime` | Timestamp |
-
-### **Message**
-| Column           | Type   | Description                      |
-|-----------------|--------|---------------------------------|
-| `id`           | `int`  | Primary Key                      |
-| `conversation_id` | `int`  | Foreign Key (Conversation ID) |
-| `sender`       | `str`  | "User" or AI Character          |
-| `content`      | `text`  | Message text                    |
+### **🚀 Running Gradio UI**
+```bash
+python frontend/gradio_ui.py
+```
 
 ---
 
 ## **🛠 Deployment**
-### **1️⃣ Deploy on Render**
-- **Modify `docker-compose.yml` and `Dockerfile` to use a production database.**
-- Use **Render, AWS, or DigitalOcean** for hosting.
-
-### **2️⃣ Deploy Database (PostgreSQL)**
-- Use **Managed PostgreSQL** or **Supabase**.
-
-### **3️⃣ Use HTTPS**
-- Deploy using **NGINX + Let’s Encrypt**.
+### **1️⃣ Deploy on Hugging Face Spaces**
+```bash
+gradio deploy
+```
+### **2️⃣ Deploy with Docker**
+```bash
+docker build -t ai-chat-ui .
+docker run -p 7860:7860 ai-chat-ui
+```
 
 ---
 
 ## **🔑 Security**
-✅ **Environment Variables:** Store **API keys & database credentials** in `.env`.  
-✅ **JWT Authentication:** Secure API with JWT tokens.  
-✅ **CORS Policy:** Restrict frontend access in `main.py`.  
-✅ **Rate Limiting:** Use `fastapi-limiter` for abuse protection.  
+✅ **Use HTTPS for Deployment**  
+✅ **Restrict API Access with CORS**  
+✅ **Store API Keys in `.env`**  
 
 ---
 
 ## **🚀 Contributors**
-👤 **Our Names** - All Backend Developers  
+👤 **Our Names** - Backend & UI Developers  
 📧 **Contact:** your-email@example.com  
 
-🔗 **GitHub Repo:** _(Our GitHub URL)_  
-🔗 **Live API:** _(Your API URL)_  
+🔗 **GitHub Repo:** _(Insert URL)_  
+🔗 **Live API & UI:** _(Insert URL)_  
 
